@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
 import queue
+from webbrowser import get
 import sounddevice as sd
 import vosk
 import sys
+import pyttsx3
 
+#Get engine pyttsx3
+
+engine = pyttsx3.init()
+engine.setProperty('voice', 'brazil')
+
+def speak (text):
+    engine.say(text)
+    engine.runAndWait()
+
+# Record microphone input
 q = queue.Queue()
 
 def int_or_str(text):
@@ -76,14 +89,15 @@ try:
             while True:
                 data = q.get()
                 if rec.AcceptWaveform(data):
-                    print(rec.Result())
-                else:
-                    print(rec.PartialResult())
+                    record = rec.Result()
+                    record = json.loads(record)
+                    if record is not None:
+                        say = record['text']
+                        print(say)
+                        speak(say)
                 if dump_fn is not None:
                     dump_fn.write(data)
 
 except KeyboardInterrupt:
     print('\nDone')
     parser.exit(0)
-except Exception as e:
-    parser.exit(type(e).__name__ + ': ' + str(e))
