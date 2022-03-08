@@ -4,4 +4,5 @@
 ## How use this application
     1º Create venv with this code in terminal: python -m venv venv
     2º Active venv with: "path from venv"/Scripts/Activate.ps1 <- For Windowns
-    3º Install <a href="https://alphacephei.com/vosk/models" target="_blank">vosk model</a>
+    3º Install [vosk model](https://alphacephei.com/vosk/models)
+
