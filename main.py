@@ -1,103 +1,92 @@
-#!/usr/bin/env python3
-
-import argparse
-import json
-import os
-import queue
-from webbrowser import get
-import sounddevice as sd
-import vosk
-import sys
+from datetime import datetime
+import speech_recognition as sr
 import pyttsx3
+import pywhatkit as kit
 
 #Get engine pyttsx3
 
 engine = pyttsx3.init()
 engine.setProperty('voice', 'brazil')
+audio = sr.Recognizer()
 
-def speak (text):
-    engine.say(text)
-    engine.runAndWait()
-
-# Record microphone input
-q = queue.Queue()
-
-def int_or_str(text):
-    """Helper function for argument parsing."""
+def get_command():
     try:
-        return int(text)
-    except ValueError:
-        return text
+        with sr.Microphone() as source:
+            print('Say something!')
+            voice = audio.listen(source)
+            command = audio.recognize_google(voice, language='pt-BR')
+            command = command.lower()
+            print(command)
+            if 'verônica' in command:
+                command = command.replace('verônica', '')
+                print(command)
 
-def callback(indata, frames, time, status):
-    """This is called (from a separate thread) for each audio block."""
-    if status:
-        print(status, file=sys.stderr)
-    q.put(bytes(indata))
 
-parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument(
-    '-l', '--list-devices', action='store_true',
-    help='show list of audio devices and exit')
-args, remaining = parser.parse_known_args()
-if args.list_devices:
-    print(sd.query_devices())
-    parser.exit(0)
-parser = argparse.ArgumentParser(
-    description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-    parents=[parser])
-parser.add_argument(
-    '-f', '--filename', type=str, metavar='FILENAME',
-    help='audio file to store recording to')
-parser.add_argument(
-    '-m', '--model', type=str, metavar='MODEL_PATH',
-    help='Path to the model')
-parser.add_argument(
-    '-d', '--device', type=int_or_str,
-    help='input device (numeric ID or substring)')
-parser.add_argument(
-    '-r', '--samplerate', type=int, help='sampling rate')
-args = parser.parse_args(remaining)
+    except Exception as e:
+        print (e)
+    return command
 
-try:
-    if args.model is None:
-        args.model = "model"
-    if not os.path.exists(args.model):
-        print ("Please download a model for your language from https://alphacephei.com/vosk/models")
-        print ("and unpack as 'model' in the current folder.")
-        parser.exit(0)
-    if args.samplerate is None:
-        device_info = sd.query_devices(args.device, 'input')
-        # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(device_info['default_samplerate'])
+def send_mensage(number):
+    engine.say('Qual mensagem deseja enviar?')
+    engine.runAndWait()
+    with sr.Microphone() as source:
+        print('Say something!')
+        voice = audio.listen(source)
+        mic = audio.recognize_google(voice, language='pt-BR')
+        mic = str(mic.lower())
+        try:
+            data = datetime.now().strftime('%H:%M:%S')
+            hour = int(data[0:2])
+            minute = int(data[3:5]) + 1
+            second = int(data[6:8])
+            kit.sendwhatmsg(number, mic, hour, minute, second)
+            engine.say('Mensagem enviada')
+            engine.runAndWait() 
+        except Exception as e:
+            print(e)
+                  
+                
+                
 
-    model = vosk.Model(args.model)
+def commands():
+    command = get_command()
+    if 'dia é hoje' in command:
+        engine.say(datetime.now().strftime('%d/%m/%Y'))
+        engine.runAndWait()
+    elif 'horas são' in command:
+        engine.say(datetime.now().strftime('%H:%M'))
+        engine.runAndWait()
+    elif 'enviar mensagem' in command:
+        engine.say('Para quem deseja enviar a mensagem ?')
+        engine.runAndWait()
+        with sr.Microphone() as source:
+            print('Say something!')
+            voice = audio.listen(source)
+            mic = audio.recognize_google(voice, language='pt-BR')
+            mic = mic.lower()
+            if '' in mic: #insert person name
+                send_mensage('') #insert phone number
+            elif '' in mic: #insert person name
+                send_mensage('') #insert phone number
+            else:
+                engine.say('Contato não encontrado')
+                engine.runAndWait()
+    elif 'pesquisar no youtube' or 'pesquisar youtube' in command:
+        engine.say('Qual o nome do vídeo?')
+        engine.runAndWait()
+        if 'pesquisar no youtube' in command:
+            command = command.replace('pesquisar no youtube', '')
+        elif 'pesquisar youtube' in command:
+            command = command.replace('pesquisar youtube', '')
+        try:
+            kit.playonyt(command)
+        except Exception as e:
+            print(e)
 
-    if args.filename:
-        dump_fn = open(args.filename, "wb")
     else:
-        dump_fn = None
+        engine.say('Não tenho esse comando')
+        engine.runAndWait()
 
-    with sd.RawInputStream(samplerate=args.samplerate, blocksize = 8000, device=args.device, dtype='int16',
-                            channels=1, callback=callback):
-            print('#' * 80)
-            print('Press Ctrl+C to stop the recording')
-            print('#' * 80)
 
-            rec = vosk.KaldiRecognizer(model, args.samplerate)
-            while True:
-                data = q.get()
-                if rec.AcceptWaveform(data):
-                    record = rec.Result()
-                    record = json.loads(record)
-                    if record is not None:
-                        say = record['text']
-                        print(say)
-                        speak(say)
-                if dump_fn is not None:
-                    dump_fn.write(data)
-
-except KeyboardInterrupt:
-    print('\nDone')
-    parser.exit(0)
+get_command()
+commands()
